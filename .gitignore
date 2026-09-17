@@ -1,0 +1,14 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Local copied/updated LangChain project
+Updated-Langchain-main/
+updated-langchain/
+
+# Environment files and notebook checkpoints
+.env
+*.env
+**/.ipynb_checkpoints/
