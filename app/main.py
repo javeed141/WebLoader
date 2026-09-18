@@ -1,11 +1,22 @@
 # uvicorn app.main:app --reload
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.research import research_news
 
 app = FastAPI(title="GenAI News Research Assistant")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://webloader-maq2.onrender.com",
+    ],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["*"],
+)
 
 class ResearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
