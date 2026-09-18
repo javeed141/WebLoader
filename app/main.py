@@ -12,9 +12,9 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://webloader-maq2.onrender.com",
-        "https://rag-react-fronted-beige.vercel.app/"
+        "https://rag-react-fronted-beige.vercel.app",
     ],
+    allow_origin_regex=r"https://rag-react-fronted(?:-[a-z0-9-]+)?\.vercel\.app",
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
 )
