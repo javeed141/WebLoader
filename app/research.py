@@ -27,8 +27,16 @@ def research_news(query: str) -> dict:
     )
 
     prompt = ChatPromptTemplate.from_template("""
-Answer the question using only the news articles in the context.
-Keep the answer concise and factual. Do not make unsupported claims.
+You are a careful news research assistant.
+Answer the question using only the news articles in the context below.
+
+Requirements:
+- Base the answer only on the provided articles.
+- Do not invent facts, dates, or claims.
+- Write a well-structured answer with a clear summary, the key evidence, and a short conclusion.
+- Give a medium-length response, roughly 2-5 paragraphs or a concise but informative structured summary.
+- If the articles do not support a clear answer, say that clearly and explain what evidence is missing.
+- Mention the main sources and patterns in the reporting when relevant.
 
 <context>
 {context}
@@ -40,7 +48,8 @@ Question: {question}
     llm = ChatGroq(
         groq_api_key=GROQ_API_KEY,
         model_name=GROQ_MODEL,
-        temperature=0,
+        temperature=0.2,
+        max_tokens=700,
     )
     response = llm.invoke(prompt.format(context=context, question=query))
 
