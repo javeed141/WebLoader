@@ -1,12 +1,19 @@
 # uvicorn app.main:app --reload
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.research import research_news
+from app.rate_limit import rate_limit_middleware
+
 
 app = FastAPI(title="GenAI News Research Assistant")
 
+# Rate limiter
+app.middleware("http")(rate_limit_middleware)
+
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -19,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 class ResearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
 
@@ -29,8 +37,8 @@ def health():
 
 
 @app.post("/news/research")
-def news_research(request: ResearchRequest):
+async def news_research(request: ResearchRequest):
     try:
-        return research_news(request.query)
+        return await research_news(request.query)
     except Exception as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
