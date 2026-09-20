@@ -2,11 +2,14 @@ import asyncio
 import ipaddress
 import logging
 import re
+import asyncio
+import aiohttp
 from urllib.parse import urlparse
 from collections.abc import Mapping
 
 from langchain_core.documents import Document
 from langchain_community.document_loaders import WebBaseLoader
+from langchain_core.documents import Document
 
 
 logger = logging.getLogger(__name__)
@@ -21,7 +24,10 @@ def _is_allowed_url(value: object) -> bool:
     if not isinstance(value, str):
         return False
 
-    parsed = urlparse(value)
+    try:
+        parsed = urlparse(value)
+    except ValueError:
+        return False
     hostname = parsed.hostname
     if parsed.scheme not in {"http", "https"} or not hostname or parsed.username:
         return False
@@ -39,9 +45,18 @@ def _is_allowed_url(value: object) -> bool:
 
 
 async def load_articles(search_results: list[dict]) -> list[Document]:
+    """Asynchronously load article pages and keep usable text."""
+    articles: list[Document] = []
+    semaphore = asyncio.Semaphore(5)  # limit concurrent fetches
+    semaphore = asyncio.Semaphore(5)  # max 5 concurrent fetches
     """Load valid article URLs concurrently and return usable document text."""
     semaphore = asyncio.Semaphore(MAX_CONCURRENT_LOADS)
 
+    async def fetch_one(url: str, meta: dict) -> Document | None:
+        # Skip non-article URLs (YouTube, etc.)
+        domain = urlparse(url).netloc.lower()
+        if "youtube.com" in domain or "youtu.be" in domain:
+            print(f"[SKIP] Non-article URL: {url}")
     async def fetch_one(url: str, meta: Mapping[str, object]) -> Document | None:
         if not _is_allowed_url(url):
             logger.warning("Skipping invalid or unsafe article URL: %s", url)
@@ -54,6 +69,14 @@ async def load_articles(search_results: list[dict]) -> list[Document]:
 
         async with semaphore:
             try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(url, timeout=10) as resp:
+                        html = await resp.text()
+                # Run the blocking WebBaseLoader.load() in a thread so it doesn't block the event loop
+                loop = asyncio.get_event_loop()
+                loader = WebBaseLoader(web_paths=(url,))
+                docs = loader.load()
+                docs = await loop.run_in_executor(None, loader.load)
                 loader = WebBaseLoader(
                     web_paths=(url,),
                     requests_kwargs={"timeout": REQUEST_TIMEOUT_SECONDS},
@@ -61,6 +84,16 @@ async def load_articles(search_results: list[dict]) -> list[Document]:
                 )
                 docs = await asyncio.to_thread(loader.load)
 
+                if docs and len(docs[0].page_content) > 300:
+                    docs[0].page_content = re.sub(r"\s+", " ", docs[0].page_content).strip()
+                    docs[0].metadata.update(meta)
+                    print(f"[OK] Fetched {url}: {len(docs[0].page_content)} chars")
+                    return docs[0]
+                else:
+                    print(f"[SKIP] Too short or empty: {url}")
+            except Exception as error:
+                print(f"Could not load {url}: {error}")
+                print(f"[ERROR] Could not load {url}: {error}")
                 if not docs or not docs[0].page_content:
                     logger.info("Skipping empty article: %s", url)
                     return None
@@ -78,6 +111,10 @@ async def load_articles(search_results: list[dict]) -> list[Document]:
                 logger.exception("Could not load article: %s", url)
         return None
 
+    tasks = [fetch_one(result["url"], result) for result in search_results]
+    for article in await asyncio.gather(*tasks):
+        if article:
+            articles.append(article)
     tasks = []
     for result in search_results:
         url = result.get("url") if isinstance(result, Mapping) else None
@@ -88,5 +125,6 @@ async def load_articles(search_results: list[dict]) -> list[Document]:
 
     results = await asyncio.gather(*tasks)
     articles = [a for a in results if a is not None]
+    print(f"[INFO] Total articles loaded: {len(articles)}")
     logger.info("Finished loading articles: count=%d", len(articles))
     return articles

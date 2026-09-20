@@ -10,8 +10,10 @@ from app.rate_limit import rate_limit_middleware
 
 app = FastAPI(title="GenAI News Research Assistant")
 
+
 # Rate limiter
 app.middleware("http")(rate_limit_middleware)
+
 
 # CORS
 app.add_middleware(
@@ -30,10 +32,19 @@ app.add_middleware(
 class ResearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500)
 
+    query: str = Field(
+        min_length=3,
+        max_length=500
+    )
+
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+    return {
+        "status": "ok"
+    }
 
 
 @app.post("/news/research")
@@ -42,3 +53,10 @@ async def news_research(request: ResearchRequest):
         return await research_news(request.query)
     except Exception as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=502,
+            detail=str(error)
+        ) from error
