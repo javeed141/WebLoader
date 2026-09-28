@@ -22,6 +22,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
         "https://rag-react-fronted-beige.vercel.app",
+        "https://genai-news-rag.vercel.app/"
     ],
     allow_origin_regex=r"https://rag-react-fronted(?:-[a-z0-9-]+)?\.vercel\.app",
     allow_methods=["GET", "POST", "OPTIONS"],
